@@ -26,8 +26,11 @@ const PatientForm = () => {
 
   const [showPrescription, setShowPrescription] = useState(false);
   const [showForceImage, setShowForceImage] = useState(false);
+  const [formLocked, setFormLocked] = useState(false); // New state to track if form is locked
 
   const handleChange = (e) => {
+    if (formLocked) return; // Prevent changes if form is locked
+    
     const { name, value, multiple, options } = e.target;
   
     if (multiple) {
@@ -50,6 +53,7 @@ const PatientForm = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setShowPrescription(true); // Show the prescription after submit
+    setFormLocked(true); // Lock the form after submit
   };
   
   const [showOptions, setShowOptions] = useState(false);
@@ -65,6 +69,8 @@ const PatientForm = () => {
   ];
   
   const handleCheckboxChange = (e, value) => {
+    if (formLocked) return; // Prevent changes if form is locked
+    
     setFormData((prevData) => {
       const alreadySelected = prevData.considerations.includes(value);
       const newValues = alreadySelected
@@ -126,6 +132,11 @@ const PatientForm = () => {
     "ele_school": ageGroupNote_5to18,
     "mid_school": ageGroupNote_5to18,
     "high_school": ageGroupNote_5to18,
+    "adult": (
+      <div className="mb-4 text-sm text-gray-700 space-y-1">
+        <p> · At least 150 minutes of moderate-intensity physical activity and 2 days of muscle strengthening activity</p>
+      </div>
+    )
   };
   
   const exerciseFrequency = {
@@ -190,8 +201,9 @@ const PatientForm = () => {
               name="patientName"
               value={formData.patientName}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
               required
+              disabled={formLocked}
             />
           </div>
 
@@ -204,8 +216,9 @@ const PatientForm = () => {
               name="ageGroup"
               value={formData.ageGroup}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
               required
+              disabled={formLocked}
             >
               <option value="">Select Age Group</option>
               <option value="<5">&lt;5</option>
@@ -226,8 +239,9 @@ const PatientForm = () => {
               name="exerciseLevel"
               value={formData.exerciseLevel}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
               required
+              disabled={formLocked}
             >
               <option value="">Select Exercise Level</option>
               <option value="beginner">Beginner (0-2 days/week)</option>
@@ -246,8 +260,9 @@ const PatientForm = () => {
               name="exerciseDuration"
               value={formData.exerciseDuration}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
               required
+              disabled={formLocked}
             >
               <option value="">Select Exercise Duration</option>
               <option value="0">0 minutes</option>
@@ -267,8 +282,9 @@ const PatientForm = () => {
               name="diagnosis"
               value={formData.diagnosis}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
               required
+              disabled={formLocked}
             >
               <option value="">Select Diagnosis</option>
               <option value="simple CHD">Simple CHD</option>
@@ -301,7 +317,10 @@ const PatientForm = () => {
               Cardiac Considerations
             </label>
 
-            <div className="border rounded-lg p-3 cursor-pointer" onClick={() => setShowOptions(!showOptions)}>
+            <div 
+              className={`border rounded-lg p-3 ${formLocked ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : 'cursor-pointer'}`} 
+              onClick={() => !formLocked && setShowOptions(!showOptions)}
+            >
               {formData.considerations.length > 0
                 ? formData.considerations.map((val) => (
                     <span key={val} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-2 mb-1">
@@ -311,7 +330,7 @@ const PatientForm = () => {
                 : "Select Considerations"}
             </div>
 
-            {showOptions && (
+            {showOptions && !formLocked && (
               <div className="absolute z-10 bg-white border mt-1 rounded-lg shadow-lg w-full max-h-60 overflow-y-auto">
                 {checkboxOptions.map((option) => (
                   <label key={option.value} className="flex items-center px-4 py-2 hover:bg-gray-100">
@@ -321,7 +340,7 @@ const PatientForm = () => {
                       checked={formData.considerations.includes(option.value)}
                       onChange={(e) => handleCheckboxChange(e, option.value)}
                       className="mr-2"
-                      required
+                      disabled={formLocked}
                     />
                     {option.label}
                   </label>
@@ -343,6 +362,7 @@ const PatientForm = () => {
                 onClick={() => setShowForceImage(true)}
                 className="text-blue-500 hover:text-blue-700"
                 title="View FORCE image"
+                disabled={formLocked} // Optional: you may want to still allow viewing the image even when locked
               >
                 <FontAwesomeIcon icon={faImage} />
               </button>
@@ -352,8 +372,9 @@ const PatientForm = () => {
               name="riskLevel"
               value={formData.riskLevel}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
               required
+              disabled={formLocked}
             >
               <option value="">Select Risk Level</option>
               <option value="level1">Level 1</option>
@@ -393,9 +414,14 @@ const PatientForm = () => {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition duration-300"
+            className={`w-full p-3 rounded-lg transition duration-300 ${
+              formLocked 
+                ? 'bg-gray-400 text-white cursor-not-allowed' 
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+            }`}
+            disabled={formLocked}
           >
-            Generate Prescription
+            {formLocked ? 'Prescription Generated' : 'Generate Prescription'}
           </button>
         </form>
       </div>
@@ -437,11 +463,16 @@ const PatientForm = () => {
         </div>
       
         {/* Signature */}
-        <div class="w-full max-w-sm min-w-[200px]">
-          <label class="block mb-2 text-sm text-slate-600">
+        <div className="w-full max-w-sm min-w-[200px]">
+          <label className="block mb-2 text-sm text-slate-600">
               Signed By:
           </label>
-          <input class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow" placeholder="Type here..." />
+          <input 
+            className={`w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow ${
+              formLocked ? '' : ''
+            }`}
+            placeholder="Type here..." 
+          />
         </div>
       </div>      
       )}
