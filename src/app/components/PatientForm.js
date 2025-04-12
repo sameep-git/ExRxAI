@@ -114,7 +114,7 @@ const PatientForm = () => {
   const ageGroupNotes = {
     "<5": (
       <div className="mb-4 text-sm text-gray-700 space-y-1">
-        <p> · Children should be physically active and have plenty of opportunities to move throughout the day¹</p>
+        <p> · Children should be physically active and have plenty of opportunities to move throughout the day</p>
         <p> · 3+ hours of activity throughout the day</p>
         <ul className="list-disc list-inside ml-4">
           <li><strong>Toddlers:</strong> free play outside</li>

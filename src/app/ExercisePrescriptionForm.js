@@ -126,9 +126,9 @@ export default function ExercisePrescriptionForm() {
                     <SelectValue placeholder="Select FORCE Entry Level" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Entry">Entry (2 days/week, 50-90% HR, >15 min, RPE 11-12)</SelectItem>
-                    <SelectItem value="Intermediate">Intermediate (3 days/week, 60-90% HR, >20 min, RPE 12-14)</SelectItem>
-                    <SelectItem value="Advanced">Advanced (4+ days/week, 65-90% HR, >25 min, RPE 13-15)</SelectItem>
+                    <SelectItem value="Entry">Entry (2 days/week, 50-90% HR, 15 min, RPE 11-12)</SelectItem>
+                    <SelectItem value="Intermediate">Intermediate (3 days/week, 60-90% HR, 20 min, RPE 12-14)</SelectItem>
+                    <SelectItem value="Advanced">Advanced (4+ days/week, 65-90% HR, 25 min, RPE 13-15)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
