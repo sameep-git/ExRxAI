@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Image from "next/image";
 import ReactDOM from 'react-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faImage } from '@fortawesome/free-solid-svg-icons';
+import { faImage, faFilePdf, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { generateExercisePrescription, generateStrengthTrainingType } from "../lib/ai/gemini";
+import html2canvas from "html2canvas-pro";
+import jsPDF from "jspdf";
 
 const PatientForm = () => {
   const [formData, setFormData] = useState({
@@ -21,15 +24,20 @@ const PatientForm = () => {
     baselineOxygenSaturation: "",
     peakOxygenSaturation: "",
     considerations: [],
-    exerciseDuration: ""
+    exerciseDuration: "",
+    comments: ""
   });
 
   const [showPrescription, setShowPrescription] = useState(false);
   const [showForceImage, setShowForceImage] = useState(false);
-  const [formLocked, setFormLocked] = useState(false); // New state to track if form is locked
+  const [loading, setLoading] = useState(false);
+  const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+  const [aerobicResult, setAerobicResult] = useState("Need to get this from AI :)");
+  const [strengthResult, setStrengthResult] = useState("Need to get this from AI :)");
+
+  const prescriptionRef = useRef(null);
 
   const handleChange = (e) => {
-    if (formLocked) return; // Prevent changes if form is locked
     
     const { name, value, multiple, options } = e.target;
   
@@ -50,10 +58,21 @@ const PatientForm = () => {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+    try {
+      e.preventDefault();
+      const result = await generateExercisePrescription(formData);
+      const strResult = await generateStrengthTrainingType(formData);
+      setAerobicResult(result);
+      setStrengthResult(strResult);
+      console.log("Generated prescription.");
+    } catch {
+      console.error("Error generating prescription.")
+    } finally {
+      setLoading(false);
+    }
+    
     setShowPrescription(true); // Show the prescription after submit
-    setFormLocked(true); // Lock the form after submit
   };
   
   const [showOptions, setShowOptions] = useState(false);
@@ -69,7 +88,6 @@ const PatientForm = () => {
   ];
   
   const handleCheckboxChange = (e, value) => {
-    if (formLocked) return; // Prevent changes if form is locked
     
     setFormData((prevData) => {
       const alreadySelected = prevData.considerations.includes(value);
@@ -83,7 +101,52 @@ const PatientForm = () => {
       };
     });
   };
-  
+
+  const handleGeneratePDF = async () => {
+    try {
+      setIsPdfGenerating(true);
+      
+      const element = prescriptionRef.current;
+      if (!element) return;
+
+      // Capture the content as canvas
+      const canvas = await html2canvas(element, {
+        useCORS: true, // For cross-origin images
+        scale: 4, // Higher resolution
+        logging: false // Disable console logging
+      });
+
+      // Calculate PDF dimensions
+      const imgWidth = element.offsetWidth;
+      const imgHeight = element.offsetHeight;
+      const orientation = imgWidth > imgHeight ? 'l' : 'p';
+
+      // Create new PDF
+      const pdf = new jsPDF({
+        orientation,
+        unit: 'px',
+        format: [imgWidth, imgHeight]
+      });
+
+      // Add canvas image to PDF
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      // Generate filename
+      const filename = `${formData.patientName ? formData.patientName.replace(/\s+/g, '_') : 'Patient'}_Prescription_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+
+      // Save the PDF
+      pdf.save(filename);
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('There was an error generating your PDF. Please try again.');
+    } finally {
+      setIsPdfGenerating(false);
+    }
+  };
+
+
   const formatLabel = (value) => {
     const match = checkboxOptions.find((opt) => opt.value === value);
     return match ? match.label : value;
@@ -95,12 +158,17 @@ const PatientForm = () => {
         · At least 60 minutes per day of moderate- to vigorous-intensity physical activity, mostly aerobic¹, including free play and organized sports
       </p>
       <ul className="list-disc list-inside ml-6 space-y-1">
+        
         <li>
           <strong>Aerobic activity:</strong> Most of the daily 60 minutes or more should include activities such as walking, running, or anything that makes their hearts beat faster. At least 3 days a week should include vigorous-intensity activities
         </li>
-        <li><strong>Elementary ages:</strong> Activities focus on fun</li>
-        <li><strong>Middle school:</strong> Activities focus on socialization, avoiding specialization in one sport</li>
-        <li><strong>Teenagers:</strong> Activities focus on socialization and competition, when appropriate</li>
+        {formData.ageGroup=='ele_school' && (
+        <li><strong>Elementary ages:</strong> Activities focus on fun</li>)}
+        {formData.ageGroup=='mid_school' && (
+        <li><strong>Middle school:</strong> Activities focus on socialization, avoiding specialization in one sport</li>)}
+        {formData.ageGroup=='high_school' && (
+          <li><strong>Teenagers:</strong> Activities focus on socialization and competition, when appropriate</li>
+        )}
       </ul>
   
       <p>
@@ -163,7 +231,7 @@ const PatientForm = () => {
       <br />
       <strong>Time:</strong> {exerciseDurations[formData.exerciseDuration] || "N/A"} minutes per session
       <br />
-      <strong>Type:</strong> Need to get this from AI :)
+      <strong>Type:</strong> {aerobicResult}
       <br />  
     </div>
   );
@@ -178,7 +246,7 @@ const PatientForm = () => {
       <br />
       <strong>Time:</strong> {exerciseDurations[formData.exerciseDuration] || "N/A"} minutes per session
       <br />
-      <strong>Type:</strong> Need to get this from AI :)
+      <strong>Type:</strong> {strengthResult}
       <br />
     </p>
   );
@@ -201,9 +269,8 @@ const PatientForm = () => {
               name="patientName"
               value={formData.patientName}
               onChange={handleChange}
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
               required
-              disabled={formLocked}
             />
           </div>
 
@@ -216,9 +283,8 @@ const PatientForm = () => {
               name="ageGroup"
               value={formData.ageGroup}
               onChange={handleChange}
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
               required
-              disabled={formLocked}
             >
               <option value="">Select Age Group</option>
               <option value="<5">&lt;5</option>
@@ -239,9 +305,8 @@ const PatientForm = () => {
               name="exerciseLevel"
               value={formData.exerciseLevel}
               onChange={handleChange}
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
               required
-              disabled={formLocked}
             >
               <option value="">Select Exercise Level</option>
               <option value="beginner">Beginner (0-2 days/week)</option>
@@ -260,9 +325,8 @@ const PatientForm = () => {
               name="exerciseDuration"
               value={formData.exerciseDuration}
               onChange={handleChange}
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
               required
-              disabled={formLocked}
             >
               <option value="">Select Exercise Duration</option>
               <option value="0">0 minutes</option>
@@ -282,9 +346,8 @@ const PatientForm = () => {
               name="diagnosis"
               value={formData.diagnosis}
               onChange={handleChange}
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
               required
-              disabled={formLocked}
             >
               <option value="">Select Diagnosis</option>
               <option value="simple CHD">Simple CHD</option>
@@ -318,8 +381,8 @@ const PatientForm = () => {
             </label>
 
             <div 
-              className={`border rounded-lg p-3 ${formLocked ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : 'cursor-pointer'}`} 
-              onClick={() => !formLocked && setShowOptions(!showOptions)}
+              className={`border rounded-lg p-3 cursor-pointer`} 
+              onClick={() => setShowOptions(!showOptions)}
             >
               {formData.considerations.length > 0
                 ? formData.considerations.map((val) => (
@@ -330,7 +393,7 @@ const PatientForm = () => {
                 : "Select Considerations"}
             </div>
 
-            {showOptions && !formLocked && (
+            {showOptions && (
               <div className="absolute z-10 bg-white border mt-1 rounded-lg shadow-lg w-full max-h-60 overflow-y-auto">
                 {checkboxOptions.map((option) => (
                   <label key={option.value} className="flex items-center px-4 py-2 hover:bg-gray-100">
@@ -340,7 +403,6 @@ const PatientForm = () => {
                       checked={formData.considerations.includes(option.value)}
                       onChange={(e) => handleCheckboxChange(e, option.value)}
                       className="mr-2"
-                      disabled={formLocked}
                     />
                     {option.label}
                   </label>
@@ -362,7 +424,6 @@ const PatientForm = () => {
                 onClick={() => setShowForceImage(true)}
                 className="text-blue-500 hover:text-blue-700"
                 title="View FORCE image"
-                disabled={formLocked} // Optional: you may want to still allow viewing the image even when locked
               >
                 <FontAwesomeIcon icon={faImage} />
               </button>
@@ -372,9 +433,8 @@ const PatientForm = () => {
               name="riskLevel"
               value={formData.riskLevel}
               onChange={handleChange}
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${formLocked ? 'bg-gray-100 text-gray-700' : ''}`}
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 `}
               required
-              disabled={formLocked}
             >
               <option value="">Select Risk Level</option>
               <option value="level1">Level 1</option>
@@ -409,19 +469,54 @@ const PatientForm = () => {
             </div>
           )}
 
-
+          {/* Comments */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Comments
+            </label>
+            <textarea
+              name="comments"
+              value={formData.comments || ""}
+              onChange={handleChange}
+              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              rows={4}
+              placeholder="Add any additional notes about preferred exercises here..."
+            />
+          </div>
 
           {/* Submit Button */}
           <button
             type="submit"
-            className={`w-full p-3 rounded-lg transition duration-300 ${
-              formLocked 
-                ? 'bg-gray-400 text-white cursor-not-allowed' 
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            }`}
-            disabled={formLocked}
+            className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
+            disabled={loading}
           >
-            {formLocked ? 'Prescription Generated' : 'Generate Prescription'}
+            {loading ? (
+              <div className="flex items-center justify-center gap-2">
+                <svg
+                  className="animate-spin h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  ></path>
+                </svg>
+                Submitting...
+              </div>
+            ) : (
+              "Submit"
+            )}
           </button>
         </form>
       </div>
@@ -429,52 +524,77 @@ const PatientForm = () => {
       {/* Prescription Output */}
       {showPrescription && (
         <div className="w-full lg:w-1/2 bg-white p-8 rounded-2xl shadow-xl ml-0 lg:ml-6">
-        <h3 className="text-2xl font-bold text-blue-600 mb-4">
-          Personalized Exercise Prescription
-        </h3>
-        <p className="text-gray-700 mb-4">
-          <strong className="text-gray-900">Patient Name:</strong>{" "}
-          {formData.patientName || "N/A"}
-          <br />
-          <strong className="text-gray-900">Date:</strong>{" "}
-          {new Date().toLocaleDateString()}
-        </p>
-        
-        {ageGroupNotes[formData.ageGroup]}
+          {/* PDF download button - above the prescription content */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={handleGeneratePDF}
+              disabled={isPdfGenerating}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                isPdfGenerating
+                  ? 'bg-gray-400 cursor-wait'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              } text-white transition duration-200`}
+            >
+              {isPdfGenerating ? (
+                <>
+                  <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <FontAwesomeIcon icon={faFilePdf} />
+                  <span>Download PDF</span>
+                </>
+              )}
+            </button>
+          </div>
 
-        {/* Aerobic Section */}
-        <div className="bg-blue-50 p-4 rounded-lg shadow-md mb-4">
-          <h4 className="font-semibold text-lg text-blue-700">Aerobic Exercise</h4>
-          {aerobicNotes}
-        </div>
-      
-        {/* Strength Section */}
-        <div className="bg-blue-50 p-4 rounded-lg shadow-md mb-4">
-          <h4 className="font-semibold text-lg text-blue-700">Strength Training</h4>
-          {strengthNotes}
-        </div>
-      
-        {/* Flexibility Section */}
-        <div className="bg-blue-50 p-4 rounded-lg shadow-md mb-4">
-          <h4 className="font-semibold text-lg text-blue-700">Flexibility</h4>
-          <p className="text-sm text-gray-600">
-            Incorporate stretching exercises to cool down after each session
+        <div ref={prescriptionRef} className="bg-white p-6 rounded-lg">
+          <h3 className="text-2xl font-bold text-blue-600 mb-4">
+            Personalized Exercise Prescription
+          </h3>
+          <p className="text-gray-700 mb-4">
+            <strong className="text-gray-900">Patient Name:</strong>{" "}
+            {formData.patientName || "N/A"}
+            <br />
+            <strong className="text-gray-900">Date:</strong>{" "}
+            {new Date().toLocaleDateString()}
           </p>
+          
+          {ageGroupNotes[formData.ageGroup]}
+
+          {/* Aerobic Section */}
+          <div className="bg-blue-50 p-4 rounded-lg shadow-md mb-4">
+            <h4 className="font-semibold text-lg text-blue-700">Aerobic Exercise</h4>
+            {aerobicNotes}
+          </div>
+        
+          {/* Strength Section */}
+          <div className="bg-blue-50 p-4 rounded-lg shadow-md mb-4">
+            <h4 className="font-semibold text-lg text-blue-700">Strength Training</h4>
+            {strengthNotes}
+          </div>
+        
+          {/* Flexibility Section */}
+          <div className="bg-blue-50 p-4 rounded-lg shadow-md mb-4">
+            <h4 className="font-semibold text-lg text-blue-700">Flexibility</h4>
+            <p className="text-sm text-gray-600">
+              Incorporate stretching exercises to cool down after each session
+            </p>
+          </div>
+        
+          {/* Signature */}
+          <div className="w-full max-w-sm min-w-[200px]">
+            <label className="block mb-2 text-sm text-slate-600">
+                Signed By:
+            </label>
+            <input 
+              className={`w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow`}
+              placeholder="Type here..." 
+            />
+          </div>
+        </div>      
         </div>
-      
-        {/* Signature */}
-        <div className="w-full max-w-sm min-w-[200px]">
-          <label className="block mb-2 text-sm text-slate-600">
-              Signed By:
-          </label>
-          <input 
-            className={`w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow ${
-              formLocked ? '' : ''
-            }`}
-            placeholder="Type here..." 
-          />
-        </div>
-      </div>      
       )}
     </div>
   );

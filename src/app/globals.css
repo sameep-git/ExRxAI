@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  .prescription-content {
+    width: 210mm !important; /* A4 width */
+    min-height: 297mm !important; /* A4 height */
+    margin: 0;
+    padding: 20px;
+  }
+}
