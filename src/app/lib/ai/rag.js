@@ -10,8 +10,9 @@ const aerobicKnowledge = [
     },
   ];
   
-  export function getContextFromForm(formData) {
-    const { diagnosis, riskLevel } = formData;
+  export async function getContextFromForm(formData) {
+    try {
+      const { diagnosis, riskLevel } = formData;
   
     if (diagnosis.includes("COPD") && riskLevel === "Low") {
       return aerobicKnowledge.find((k) => k.tag === "low_copd")?.context;
@@ -22,5 +23,10 @@ const aerobicKnowledge = [
     }
   
     return "General aerobic guidelines for clinical populations.";
+    } catch (error) {
+      console.error("RAG Error:", error);
+      throw error;
+    }
+    
   }
   

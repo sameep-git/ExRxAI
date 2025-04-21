@@ -61,18 +61,33 @@ const PatientForm = () => {
   const handleSubmit = async (e) => {
     try {
       e.preventDefault();
-      const result = await generateExercisePrescription(formData);
-      const strResult = await generateStrengthTrainingType(formData);
-      setAerobicResult(result);
-      setStrengthResult(strResult);
-      console.log("Generated prescription.");
-    } catch {
-      console.error("Error generating prescription.")
+      setLoading(true);
+      
+      const response = await fetch('/api/generate-prescription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ formData }),
+      });
+  
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate prescription');
+      }
+  
+      setAerobicResult(data.aerobic);
+      setStrengthResult(data.strength);
+      setShowPrescription(true);
+  
+    } catch (error) {
+      console.error("Error:", error);
+      setAerobicResult(`Error: ${error.message}`);
+      setStrengthResult(`Error: ${error.message}`);
     } finally {
       setLoading(false);
     }
-    
-    setShowPrescription(true); // Show the prescription after submit
   };
   
   const [showOptions, setShowOptions] = useState(false);
@@ -222,7 +237,7 @@ const PatientForm = () => {
 
   const aerobicNotes = 
   (
-    <div className="text-sm text-gray-600">
+    <div className="text-sm text-gray-600" contentEditable="true">
       <strong>Frequency:</strong> Begin with {exerciseFrequency[formData.exerciseLevel] || "N/A"} sessions per week (
       {formData.exerciseLevel || "N/A"} level)
       <br />
@@ -238,7 +253,7 @@ const PatientForm = () => {
 
   const strengthNotes = 
   (
-    <p className="text-sm text-gray-600">
+    <p className="text-sm text-gray-600" contentEditable="true">
       <strong>Frequency:</strong> Start with {exerciseFrequency[formData.exerciseLevel] || "N/A"} sessions per week 
       ({formData.exerciseLevel || "N/A"} level)
       <br />
